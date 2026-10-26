@@ -8,131 +8,87 @@ const generateBtn = document.getElementById('generateBtn');
 const exportBtn = document.getElementById('exportBtn');
 const statusText = document.getElementById('statusText');
 
-const stylePalettes = {
-  cinematic: {
-    background: ['#0f172a', '#1d4ed8', '#111827'],
-    accent: '#f8fafc',
-    glow: 'rgba(59, 130, 246, 0.3)',
-    secondary: '#8b5cf6'
-  },
-  neon: {
-    background: ['#09090b', '#7c3aed', '#22d3ee'],
-    accent: '#f0fdfa',
-    glow: 'rgba(34, 211, 238, 0.35)',
-    secondary: '#f472b6'
-  },
-  minimal: {
-    background: ['#111827', '#334155', '#0f172a'],
-    accent: '#f8fafc',
-    glow: 'rgba(255,255,255,0.16)',
-    secondary: '#cbd5e1'
-  },
-  summer: {
-    background: ['#f97316', '#fb7185', '#facc15'],
-    accent: '#fff7ed',
-    glow: 'rgba(255,255,255,0.2)',
-    secondary: '#fff7ed'
-  },
-  luxury: {
-    background: ['#111827', '#B8860B', '#312e81'],
-    accent: '#fef3c7',
-    glow: 'rgba(251, 191, 36, 0.25)',
-    secondary: '#f5d76b'
-  }
+const palettes = {
+  cinematic: { bg1: '#0b1120', bg2: '#1d4ed8', bg3: '#0f172a', accent: '#f8fafc', glow: 'rgba(96,165,250,0.30)', alt: '#8b5cf6' },
+  neon: { bg1: '#09090b', bg2: '#7c3aed', bg3: '#22d3ee', accent: '#f0fdfa', glow: 'rgba(34,211,238,0.32)', alt: '#f472b6' },
+  minimal: { bg1: '#111827', bg2: '#334155', bg3: '#0f172a', accent: '#f8fafc', glow: 'rgba(255,255,255,0.14)', alt: '#cbd5e1' },
+  summer: { bg1: '#f97316', bg2: '#fb7185', bg3: '#facc15', accent: '#fff7ed', glow: 'rgba(255,255,255,0.24)', alt: '#fff7ed' },
+  luxury: { bg1: '#111827', bg2: '#7c3aed', bg3: '#B8860B', accent: '#fef3c7', glow: 'rgba(251,191,36,0.26)', alt: '#f5d76b' }
 };
 
-let scenePlan = [];
-let animationStart = 0;
+let animationFrameId = null;
+let exportFrameId = null;
+let animationState = null;
 let isExporting = false;
-
-function splitText(text) {
-  const raw = text.trim();
-  if (!raw) return ['Votre message', 'Votre vision', 'Votre histoire'];
-
-  const cleaned = raw.replace(/\s+/g, ' ').trim();
-  const parts = cleaned.split(/\s+(?=\b|$)/);
-  const words = cleaned.split(' ');
-
-  const first = words.slice(0, Math.min(4, words.length)).join(' ');
-  const second = words.slice(Math.min(4, words.length), Math.min(8, words.length)).join(' ') || 'Rêve ton style';
-  const third = words.slice(Math.min(8, words.length), Math.min(12, words.length)).join(' ') || 'Crée ton impact';
-
-  const list = [first, second, third].filter(Boolean).map((part) => part.trim());
-  return list.length ? list : ['Votre message', 'Votre style', 'Votre impact'];
-}
-
-function buildScenePlan(promptText, styleKey) {
-  const palette = stylePalettes[styleKey] || stylePalettes.cinematic;
-  const lines = splitText(promptText);
-  const baseTitle = lines[0];
-  const subtitle = lines[1] || 'Vidéo animée';
-  const cta = lines[2] || 'Créez votre story';
-
-  const scenes = [
-    {
-      label: 'intro',
-      title: baseTitle,
-      subtitle: 'Début d’une histoire visuelle',
-      accent: palette.accent,
-      color: palette.secondary,
-      duration: 4,
-      effect: 'fade'
-    },
-    {
-      label: 'focus',
-      title: subtitle,
-      subtitle: 'Lumière, énergie, mouvement',
-      accent: palette.secondary,
-      color: palette.accent,
-      duration: 3.5,
-      effect: 'slide'
-    },
-    {
-      label: 'cta',
-      title: cta,
-      subtitle: 'Impact visuel • animation • style moderne',
-      accent: palette.accent,
-      color: palette.secondary,
-      duration: 4.5,
-      effect: 'zoom'
-    }
-  ];
-
-  return { palette, scenes };
-}
 
 function setStatus(message) {
   statusText.textContent = message;
 }
 
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function easeOutCubic(t) {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+function stopAnimationLoop() {
+  if (animationFrameId !== null) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+  }
+}
+
+function splitText(text) {
+  const raw = text.trim();
+  if (!raw) return ['Votre message', 'Votre vision', 'Votre impact'];
+
+  const words = raw.replace(/\s+/g, ' ').split(' ');
+  const first = words.slice(0, Math.min(4, words.length)).join(' ');
+  const second = words.slice(Math.min(4, words.length), Math.min(8, words.length)).join(' ') || 'Votre vision';
+  const third = words.slice(Math.min(8, words.length), Math.min(12, words.length)).join(' ') || 'Votre impact';
+  return [first, second, third].filter(Boolean);
+}
+
+function buildScenePlan(promptText, styleKey) {
+  const palette = palettes[styleKey] || palettes.cinematic;
+  const lines = splitText(promptText);
+  const scenes = [
+    { title: lines[0], subtitle: 'Début d’une histoire visuelle', effect: 'fade', duration: 4, accent: palette.accent, second: palette.alt },
+    { title: lines[1], subtitle: 'Lumière, énergie, mouvement', effect: 'slide', duration: 3.5, accent: palette.alt, second: palette.accent },
+    { title: lines[2], subtitle: 'Impact visuel • style moderne', effect: 'zoom', duration: 4.5, accent: palette.accent, second: palette.alt }
+  ];
+  return { palette, scenes };
+}
+
 function drawBackgroundForScene(palette, t) {
-  const colors = palette.background;
   const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-  gradient.addColorStop(0, colors[0]);
-  gradient.addColorStop(0.5, colors[1]);
-  gradient.addColorStop(1, colors[2]);
+  gradient.addColorStop(0, palette.bg1);
+  gradient.addColorStop(0.5, palette.bg2);
+  gradient.addColorStop(1, palette.bg3);
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  const pulse = 0.5 + Math.sin(t * 1.2) * 0.18;
+  const pulse = 0.6 + Math.sin(t * 1.25) * 0.2;
   ctx.fillStyle = palette.glow;
   ctx.beginPath();
-  ctx.arc(canvas.width * 0.75, canvas.height * 0.2, canvas.width * 0.22 * pulse, 0, Math.PI * 2);
+  ctx.arc(canvas.width * 0.18, canvas.height * 0.82, canvas.width * 0.20 * pulse, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.beginPath();
-  ctx.arc(canvas.width * 0.2, canvas.height * 0.8, canvas.width * 0.18 * (1.3 - pulse), 0, Math.PI * 2);
+  ctx.arc(canvas.width * 0.76, canvas.height * 0.18, canvas.width * 0.24 * (1.2 - pulse), 0, Math.PI * 2);
   ctx.fill();
 }
 
-function drawScene(scene, palette, sceneProgress, totalElapsed) {
+function drawScene(scene, palette, sceneProgress, elapsed) {
   const w = canvas.width;
   const h = canvas.height;
 
-  drawBackgroundForScene(palette, totalElapsed);
+  drawBackgroundForScene(palette, elapsed);
 
-  const finished = Math.min(Math.max(sceneProgress, 0), 1);
-  const ease = 1 - Math.pow(1 - finished, 3);
+  const progress = clamp(sceneProgress, 0, 1);
+  const ease = easeOutCubic(progress);
 
   ctx.save();
   ctx.translate(w / 2, h / 2);
@@ -142,92 +98,99 @@ function drawScene(scene, palette, sceneProgress, totalElapsed) {
   let scale = 1;
   let alpha = 1;
 
-  if (scene.effect === 'fade') {
-    alpha = Math.min(1, finished * 1.3);
-  }
-
-  if (scene.effect === 'slide') {
-    x = (1 - ease) * 220;
-  }
-
-  if (scene.effect === 'zoom') {
-    scale = 0.72 + ease * 0.8;
-  }
+  if (scene.effect === 'fade') alpha = Math.min(1, progress * 1.3);
+  if (scene.effect === 'slide') x = (1 - ease) * 230;
+  if (scene.effect === 'zoom') scale = 0.75 + ease * 0.8;
 
   ctx.translate(x, y);
   ctx.scale(scale, scale);
   ctx.globalAlpha = alpha;
 
-  ctx.font = '800 120px Segoe UI';
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.30)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(-360, -120, 720, 240, 24);
+  ctx.fill();
+  ctx.stroke();
+
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = scene.accent;
+  ctx.font = '800 92px Segoe UI';
   ctx.shadowBlur = 28;
-  ctx.shadowColor = scene.color;
-  ctx.fillText(scene.title.substring(0, 24), 0, -20);
+  ctx.shadowColor = scene.accent;
+  ctx.fillStyle = scene.accent;
+  ctx.fillText(scene.title.substring(0, 18), 0, -18);
 
-  ctx.font = '500 34px Segoe UI';
+  ctx.font = '500 30px Segoe UI';
+  ctx.shadowBlur = 0;
   ctx.fillStyle = 'rgba(255,255,255,0.82)';
-  ctx.fillText(scene.subtitle, 0, 80);
+  ctx.fillText(scene.subtitle, 0, 70);
 
   ctx.restore();
 
+  const barX = 110;
+  const barY = h - 70;
+  const barW = w - 220;
   ctx.fillStyle = 'rgba(255,255,255,0.12)';
-  ctx.fillRect(80, h - 70, w - 160, 8);
+  ctx.fillRect(barX, barY, barW, 6);
   ctx.fillStyle = scene.accent;
-  const progressWidth = ((totalElapsed % 8) / 8) * (w - 160);
-  ctx.fillRect(80, h - 70, progressWidth, 8);
+  ctx.fillRect(barX, barY, (progress / 1) * barW, 6);
 }
 
-function renderAnimation(timestamp) {
-  if (!scenePlan.length) {
-    requestAnimationFrame(renderAnimation);
-    return;
-  }
+function renderCurrentFrame(elapsed) {
+  if (!animationState || animationState.scenes.length === 0) return;
 
-  const totalDuration = scenePlan.reduce((sum, part) => sum + part.duration, 0);
-  const elapsed = (timestamp - animationStart) / 1000;
+  const totalDuration = animationState.scenes.reduce((sum, scene) => sum + scene.duration, 0);
+  const timeInLoop = ((elapsed % totalDuration) + totalDuration) % totalDuration;
 
   let cursor = 0;
-  let sceneIndex = 0;
+  let currentScene = animationState.scenes[0];
+  let progress = 0;
 
-  for (let i = 0; i < scenePlan.length; i++) {
-    const scene = scenePlan[i];
-    const sceneStart = cursor;
-    const sceneEnd = cursor + scene.duration;
-
-    if (elapsed >= sceneStart && elapsed <= sceneEnd) {
-      const progress = (elapsed - sceneStart) / scene.duration;
-      drawScene(scene, scenePlan[0].palette, progress, elapsed);
+  for (const scene of animationState.scenes) {
+    if (timeInLoop <= cursor + scene.duration) {
+      currentScene = scene;
+      progress = (timeInLoop - cursor) / scene.duration;
       break;
     }
-
-    cursor = sceneEnd;
-    sceneIndex = i;
+    cursor += scene.duration;
   }
 
-  if (elapsed >= totalDuration) {
-    animationStart = timestamp;
-  }
+  drawScene(currentScene, animationState.palette, progress, elapsed);
+}
 
-  requestAnimationFrame(renderAnimation);
+function animatePreview() {
+  if (!animationState) return;
+
+  const now = performance.now();
+  const elapsed = (now - animationState.startTime) / 1000;
+  renderCurrentFrame(elapsed);
+  animationFrameId = requestAnimationFrame(animatePreview);
 }
 
 function generatePlan() {
-  const prompt = promptInput.value || 'Crée une vidéo forte et moderne';
+  const prompt = promptInput.value || 'Crée une vidéo moderne et inspirante';
   const styleKey = styleSelect.value;
   const plan = buildScenePlan(prompt, styleKey);
-  scenePlan = plan.scenes.map((scene) => ({ ...scene, palette: plan.palette }));
-  animationStart = performance.now();
-  renderAnimation(animationStart);
+
+  stopAnimationLoop();
+  animationState = {
+    startTime: performance.now(),
+    palette: plan.palette,
+    scenes: plan.scenes
+  };
+
+  renderCurrentFrame(0);
+  animationFrameId = requestAnimationFrame(animatePreview);
   setStatus('Vidéo générée : ' + styleKey);
 }
 
 function exportVideo() {
-  if (!scenePlan.length) {
-    generatePlan();
-  }
+  if (isExporting) return;
+  if (!animationState) generatePlan();
 
+  isExporting = true;
   const stream = canvas.captureStream(30);
   const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
   const chunks = [];
@@ -241,41 +204,35 @@ function exportVideo() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'text-to-video.webm';
+    link.download = 'animated-text.webm';
     link.click();
     URL.revokeObjectURL(url);
+    isExporting = false;
     setStatus('Export terminé');
   };
 
-  const plan = scenePlan;
-  const totalDuration = plan.reduce((sum, scene) => sum + scene.duration, 0);
+  const totalDuration = animationState.scenes.reduce((sum, scene) => sum + scene.duration, 0);
   const start = performance.now();
   recorder.start();
 
-  function exportFrame(timeNow) {
-    const elapsed = (timeNow - start) / 1000;
-
-    let cursor = 0;
-    for (const scene of plan) {
-      const sceneStart = cursor;
-      const sceneEnd = cursor + scene.duration;
-      if (elapsed >= sceneStart && elapsed <= sceneEnd) {
-        const progress = (elapsed - sceneStart) / scene.duration;
-        drawScene(scene, plan[0].palette, progress, elapsed);
-        break;
-      }
-      cursor = sceneEnd;
-    }
+  function exportLoop(now) {
+    const elapsed = (now - start) / 1000;
+    renderCurrentFrame(elapsed);
 
     if (elapsed < totalDuration) {
-      requestAnimationFrame(exportFrame);
+      exportFrameId = requestAnimationFrame(exportLoop);
     } else {
       recorder.stop();
+      if (exportFrameId !== null) {
+        cancelAnimationFrame(exportFrameId);
+        exportFrameId = null;
+      }
     }
   }
 
+  if (exportFrameId !== null) cancelAnimationFrame(exportFrameId);
+  exportFrameId = requestAnimationFrame(exportLoop);
   setStatus('Export en cours...');
-  requestAnimationFrame(exportFrame);
 }
 
 generateBtn.addEventListener('click', generatePlan);
@@ -289,9 +246,13 @@ document.getElementById('durationInput').addEventListener('change', () => {
 });
 
 function initialFrame() {
-  const base = buildScenePlan('Crée une vidéo moderne inspirante', styleSelect.value);
-  scenePlan = base.scenes.map((scene) => ({ ...scene, palette: base.palette }));
-  drawScene(scenePlan[0], base.palette, 1, 0.5);
+  const defaultPlan = buildScenePlan('Crée une vidéo moderne inspirante', styleSelect.value);
+  animationState = {
+    startTime: performance.now(),
+    palette: defaultPlan.palette,
+    scenes: defaultPlan.scenes
+  };
+  renderCurrentFrame(0.5);
   setStatus('Prêt');
 }
 
