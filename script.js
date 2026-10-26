@@ -9,11 +9,11 @@ const exportBtn = document.getElementById('exportBtn');
 const statusText = document.getElementById('statusText');
 
 const palettes = {
-  cinematic: { bg1: '#0b1120', bg2: '#1d4ed8', bg3: '#0f172a', accent: '#f8fafc', glow: 'rgba(96,165,250,0.30)', alt: '#8b5cf6' },
-  neon: { bg1: '#09090b', bg2: '#7c3aed', bg3: '#22d3ee', accent: '#f0fdfa', glow: 'rgba(34,211,238,0.32)', alt: '#f472b6' },
-  minimal: { bg1: '#111827', bg2: '#334155', bg3: '#0f172a', accent: '#f8fafc', glow: 'rgba(255,255,255,0.14)', alt: '#cbd5e1' },
-  summer: { bg1: '#f97316', bg2: '#fb7185', bg3: '#facc15', accent: '#fff7ed', glow: 'rgba(255,255,255,0.24)', alt: '#fff7ed' },
-  luxury: { bg1: '#111827', bg2: '#7c3aed', bg3: '#B8860B', accent: '#fef3c7', glow: 'rgba(251,191,36,0.26)', alt: '#f5d76b' }
+  cinematic: { bg1: '#0b1120', bg2: '#1d4ed8', bg3: '#0f172a', accent: '#f8fafc', glow: 'rgba(96, 165, 250, 0.30)', alt: '#8b5cf6' },
+  neon: { bg1: '#09090b', bg2: '#7c3aed', bg3: '#22d3ee', accent: '#f0fdfa', glow: 'rgba(34, 211, 238, 0.32)', alt: '#f472b6' },
+  minimal: { bg1: '#111827', bg2: '#334155', bg3: '#0f172a', accent: '#f8fafc', glow: 'rgba(255, 255, 255, 0.14)', alt: '#cbd5e1' },
+  summer: { bg1: '#f97316', bg2: '#fb7185', bg3: '#facc15', accent: '#fff7ed', glow: 'rgba(255, 255, 255, 0.24)', alt: '#fff7ed' },
+  luxury: { bg1: '#111827', bg2: '#7c3aed', bg3: '#B8860B', accent: '#fef3c7', glow: 'rgba(251, 191, 36, 0.26)', alt: '#f5d76b' }
 };
 
 let animationFrameId = null;
@@ -51,14 +51,24 @@ function splitText(text) {
   return [first, second, third].filter(Boolean);
 }
 
-function buildScenePlan(promptText, styleKey) {
+function getDurationValue() {
+  const value = Number(durationInput.value) || 12;
+  return clamp(value, 5, 30);
+}
+
+function buildScenePlan(promptText, styleKey, totalDuration) {
   const palette = palettes[styleKey] || palettes.cinematic;
   const lines = splitText(promptText);
+  const introDuration = totalDuration * 0.36;
+  const middleDuration = totalDuration * 0.32;
+  const endDuration = totalDuration * 0.32;
+
   const scenes = [
-    { title: lines[0], subtitle: 'Début d’une histoire visuelle', effect: 'fade', duration: 4, accent: palette.accent, second: palette.alt },
-    { title: lines[1], subtitle: 'Lumière, énergie, mouvement', effect: 'slide', duration: 3.5, accent: palette.alt, second: palette.accent },
-    { title: lines[2], subtitle: 'Impact visuel • style moderne', effect: 'zoom', duration: 4.5, accent: palette.accent, second: palette.alt }
+    { title: lines[0], subtitle: 'Début d’une histoire visuelle', effect: 'fade', duration: introDuration, accent: palette.accent, second: palette.alt },
+    { title: lines[1], subtitle: 'Lumière, énergie, mouvement', effect: 'slide', duration: middleDuration, accent: palette.alt, second: palette.accent },
+    { title: lines[2], subtitle: 'Impact visuel • style moderne', effect: 'zoom', duration: endDuration, accent: palette.accent, second: palette.alt }
   ];
+
   return { palette, scenes };
 }
 
@@ -72,6 +82,7 @@ function drawBackgroundForScene(palette, t) {
 
   const pulse = 0.6 + Math.sin(t * 1.25) * 0.2;
   ctx.fillStyle = palette.glow;
+
   ctx.beginPath();
   ctx.arc(canvas.width * 0.18, canvas.height * 0.82, canvas.width * 0.20 * pulse, 0, Math.PI * 2);
   ctx.fill();
@@ -135,13 +146,13 @@ function drawScene(scene, palette, sceneProgress, elapsed) {
   ctx.fillStyle = 'rgba(255,255,255,0.12)';
   ctx.fillRect(barX, barY, barW, 6);
   ctx.fillStyle = scene.accent;
-  ctx.fillRect(barX, barY, (progress / 1) * barW, 6);
+  ctx.fillRect(barX, barY, (progress) * barW, 6);
 }
 
 function renderCurrentFrame(elapsed) {
   if (!animationState || animationState.scenes.length === 0) return;
 
-  const totalDuration = animationState.scenes.reduce((sum, scene) => sum + scene.duration, 0);
+  const totalDuration = animationState.totalDuration;
   const timeInLoop = ((elapsed % totalDuration) + totalDuration) % totalDuration;
 
   let cursor = 0;
@@ -160,11 +171,19 @@ function renderCurrentFrame(elapsed) {
   drawScene(currentScene, animationState.palette, progress, elapsed);
 }
 
-function animatePreview() {
+function animatePreview(timestamp) {
   if (!animationState) return;
 
-  const now = performance.now();
-  const elapsed = (now - animationState.startTime) / 1000;
+  const elapsed = (timestamp - animationState.startTime) / 1000;
+
+  if (elapsed >= animationState.totalDuration) {
+    renderCurrentFrame(animationState.totalDuration);
+    setStatus('Vidéo terminée');
+    animationState = null;
+    stopAnimationLoop();
+    return;
+  }
+
   renderCurrentFrame(elapsed);
   animationFrameId = requestAnimationFrame(animatePreview);
 }
@@ -172,18 +191,20 @@ function animatePreview() {
 function generatePlan() {
   const prompt = promptInput.value || 'Crée une vidéo moderne et inspirante';
   const styleKey = styleSelect.value;
-  const plan = buildScenePlan(prompt, styleKey);
+  const totalDuration = getDurationValue();
+  const plan = buildScenePlan(prompt, styleKey, totalDuration);
 
   stopAnimationLoop();
   animationState = {
     startTime: performance.now(),
+    totalDuration,
     palette: plan.palette,
     scenes: plan.scenes
   };
 
-  renderCurrentFrame(0);
+  renderCurrentFrame(0.01);
   animationFrameId = requestAnimationFrame(animatePreview);
-  setStatus('Vidéo générée : ' + styleKey);
+  setStatus('Génération en cours...');
 }
 
 function exportVideo() {
@@ -211,7 +232,7 @@ function exportVideo() {
     setStatus('Export terminé');
   };
 
-  const totalDuration = animationState.scenes.reduce((sum, scene) => sum + scene.duration, 0);
+  const totalDuration = animationState.totalDuration;
   const start = performance.now();
   recorder.start();
 
@@ -246,13 +267,15 @@ document.getElementById('durationInput').addEventListener('change', () => {
 });
 
 function initialFrame() {
-  const defaultPlan = buildScenePlan('Crée une vidéo moderne inspirante', styleSelect.value);
+  const total = getDurationValue();
+  const defaultPlan = buildScenePlan('Crée une vidéo moderne inspirante', styleSelect.value, total);
   animationState = {
     startTime: performance.now(),
+    totalDuration: total,
     palette: defaultPlan.palette,
     scenes: defaultPlan.scenes
   };
-  renderCurrentFrame(0.5);
+  renderCurrentFrame(0.01);
   setStatus('Prêt');
 }
 
