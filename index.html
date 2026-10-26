@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Text-to-Video Studio</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="control-panel">
+        <div class="brand-block">
+          <span class="badge">FREE</span>
+          <h1>Text-to-Video Studio</h1>
+        </div>
+
+        <label for="promptInput">Votre texte</label>
+        <textarea id="promptInput" rows="5">Crée une vidéo dynamique pour une campagne moderne et inspirante.</textarea>
+
+        <div class="row two-cols">
+          <div>
+            <label for="styleSelect">Style</label>
+            <select id="styleSelect">
+              <option value="cinematic">Cinematic</option>
+              <option value="neon">Neon</option>
+              <option value="minimal">Minimal</option>
+              <option value="summer">Summer</option>
+              <option value="luxury">Luxury</option>
+            </select>
+          </div>
+          <div>
+            <label for="durationInput">Durée</label>
+            <input id="durationInput" type="number" min="5" max="30" value="12" />
+          </div>
+        </div>
+
+        <div class="button-row">
+          <button id="generateBtn" class="primary">Générer la vidéo</button>
+          <button id="exportBtn">Exporter WebM</button>
+        </div>
+
+        <div class="tip-box">
+          <strong>Astuce</strong>
+          <p>Écris un mot-clé ou une phrase courte pour obtenir automatiquement une séquence animée.</p>
+        </div>
+      </aside>
+
+      <main class="preview-panel">
+        <canvas id="previewCanvas" width="1280" height="720"></canvas>
+        <div class="status-bar">
+          <span id="statusText">Prêt</span>
+        </div>
+      </main>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
